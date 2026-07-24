@@ -96,39 +96,42 @@ NMEA-сообщений. Штатный способ это изменить —
 
 ## Установка
 
-Нужен **Python 3.10+** и два пакета: [`pyserial`](https://pypi.org/project/pyserial/) и
-[`pyubx2`](https://pypi.org/project/pyubx2/). Ограничение 3.10 идёт от `pyubx2`/`pynmeagps`, а не от самой утилиты.
+Нужен **Python 3.10+**. Ограничение 3.10 идёт от `pyubx2`/`pynmeagps`, а не от самой утилиты.
 
-### Windows
-
-1. Поставьте Python с [python.org](https://www.python.org/downloads/) — в установщике
-   обязательно отметьте **«Add python.exe to PATH»**.
-2. Откройте **PowerShell** или **cmd**:
-
-   ```powershell
-   pip install pyserial pyubx2
-   curl -L -o ublox_setup.py https://raw.githubusercontent.com/odmin4eg/ublox-gnss-config/main/ublox_setup.py
-   python ublox_setup.py --list
-   ```
-
-3. **Драйверы.** Windows 10/11 сама видит нативный USB u-blox, а также CP210x и FTDI.
-   Для дешёвых **PL2303** и **CH340** может понадобиться драйвер производителя
-   ([CH340](https://www.wch-ic.com/downloads/CH341SER_EXE.html),
-   [PL2303](https://www.prolific.com.tw/US/ShowProduct.aspx?p_id=225&pcid=41)).
-   Проверьте **Диспетчер устройств → Порты (COM и LPT)**: порт должен быть без жёлтого «!».
-4. **Закройте u-center перед запуском** — Windows даёт эксклюзивный доступ к COM-порту,
-   а u-center его удерживает.
-
-### Linux
+### Любая ОС — как пакет (рекомендуется)
 
 ```bash
-# Debian / Ubuntu / Raspberry Pi OS
-sudo apt install python3-pip
-pip3 install --user pyserial pyubx2
-
-wget https://raw.githubusercontent.com/odmin4eg/ublox-gnss-config/main/ublox_setup.py
-python3 ublox_setup.py --list
+pipx install git+https://github.com/odmin4eg/ublox-gnss-config
+# или: pip install git+https://github.com/odmin4eg/ublox-gnss-config
+ublox-setup --list
 ```
+
+Подтянет [`pyserial`](https://pypi.org/project/pyserial/) и
+[`pyubx2`](https://pypi.org/project/pyubx2/) и даст команду `ublox-setup`.
+
+### Любая ОС — одним файлом, без установки
+
+```bash
+pip install pyserial pyubx2
+curl -L -O https://raw.githubusercontent.com/odmin4eg/ublox-gnss-config/main/ublox_setup.py
+python3 ublox_setup.py --list          # в Windows: python ublox_setup.py --list
+```
+
+Всё, что ниже — детали по конкретной ОС, нужные только если порт не появляется.
+
+### Windows: на что смотреть
+
+- Python ставьте с [python.org](https://www.python.org/downloads/) — в установщике обязательно
+  отметьте **«Add python.exe to PATH»**.
+- **Драйверы.** Windows 10/11 сама видит нативный USB u-blox, а также CP210x и FTDI.
+  Для дешёвых **PL2303** и **CH340** может понадобиться драйвер производителя
+  ([CH340](https://www.wch-ic.com/downloads/CH341SER_EXE.html),
+  [PL2303](https://www.prolific.com.tw/US/ShowProduct.aspx?p_id=225&pcid=41)).
+  Проверьте **Диспетчер устройств → Порты (COM и LPT)**: порт должен быть без жёлтого «!».
+- **Закройте u-center перед запуском** — Windows даёт эксклюзивный доступ к COM-порту,
+  а u-center его удерживает.
+
+### Linux: на что смотреть
 
 **Права на порт.** Без этого будет `Permission denied: '/dev/ttyUSB0'`:
 
@@ -145,22 +148,14 @@ sudo systemctl stop gpsd gpsd.socket
 ```
 
 В свежих дистрибутивах (PEP 668, например Ubuntu 24.04) системный pip запрещён — используйте
-`pipx` или venv:
+`pipx` (см. выше) или venv:
 
 ```bash
 python3 -m venv ~/.venvs/ublox && ~/.venvs/ublox/bin/pip install pyserial pyubx2
 ~/.venvs/ublox/bin/python ublox_setup.py --list
 ```
 
-### macOS
-
-```bash
-brew install python                        # либо установщик с python.org
-pip3 install pyserial pyubx2
-
-curl -L -O https://raw.githubusercontent.com/odmin4eg/ublox-gnss-config/main/ublox_setup.py
-python3 ublox_setup.py --list
-```
+### macOS: на что смотреть
 
 Драйверы для нативного USB u-blox, CP210x и FTDI встроены в систему (начиная с Big Sur).
 Для CH340 и старых клонов PL2303 драйвер нужен.
@@ -168,15 +163,21 @@ python3 ublox_setup.py --list
 Всегда используйте устройство **`/dev/cu.*`**, а не `/dev/tty.*`: `tty.*` блокируется в ожидании
 сигнала несущей. Утилита при сканировании сама предпочитает `cu.*`.
 
-### Как пакет (любая ОС)
+## Быстрый старт
+
+**Просто настроить типовой автомобильный приёмник как надо:**
 
 ```bash
-pipx install git+https://github.com/odmin4eg/ublox-gnss-config
-# или: pip install git+https://github.com/odmin4eg/ublox-gnss-config
-ublox-setup --list
+ublox-setup --yes
 ```
 
-## Быстрый старт
+Это всё. Значения по умолчанию **и есть** рекомендуемый автомобильный профиль: 10 Гц, все
+созвездия, которые чип тянет одновременно, NMEA 4.1 с нужными сообщениями и отключёнными
+лишними, динамическая модель automotive, маска 10° по углу места, поправки SBAS, монитор помех
+и AssistNow включены, запись во flash. Приёмник найдётся сам, профиль подстроится под поколение,
+а в конце напечатается отчёт по спутникам — видно, что всё работает.
+
+Остальное — вариации того же:
 
 ```bash
 # что вообще подключено?
@@ -185,14 +186,11 @@ ublox-setup --list
 # интерактивно: спросит частоту и созвездия, настроит всё найденное
 ublox-setup
 
-# типовой случай: 10 Гц, во flash, без вопросов
-ublox-setup --rate 10 --yes
-
 # конкретный приёмник, 5 Гц, пешеходный профиль
 ublox-setup --port /dev/ttyUSB0 --rate 5 --dynmodel pedestrian --yes
 
 # посмотреть, что будет отправлено, ничего не трогая
-ublox-setup --dry-run --rate 10
+ublox-setup --dry-run
 
 # примерить без записи во flash (откатится при отключении питания)
 ublox-setup --no-save --yes
@@ -200,7 +198,7 @@ ublox-setup --no-save --yes
 # просто посмотреть на приёмник: решение, спутники, уровни сигнала в реальном времени
 ublox-setup --monitor --port COM3
 
-# только проверить качество канала у уже настроенного приёмника
+# только проверить уже настроенный приёмник
 ublox-setup --check 10 --port /dev/ttyUSB0
 ```
 
@@ -215,6 +213,9 @@ ublox-setup --check 10 --port /dev/ttyUSB0
 | `--talker gp\|gn` | `gp` | основной talker ID: `$GPxxx` или стандартный мульти-GNSS `$GNxxx` |
 | `--dynmodel NAME` | `automotive` | `portable`, `stationary`, `pedestrian`, `automotive`, `sea`, `airborne1g/2g/4g` |
 | `--min-elev DEG` | `10` | маска по углу места — игнорировать спутники ниже этого угла |
+| `--min-cno DBHZ` | заводское (6) | маска по уровню сигнала — отбрасывать спутники слабее |
+| `--max-pdop PDOP` | заводское (25.0) | не выдавать решение, если PDOP хуже этого |
+| `--max-tdop TDOP` | заводское (25.0) | не выдавать решение, если TDOP хуже этого |
 | `--iface auto\|uart1\|usb\|both` | `auto` | какому интерфейсу приёмника настраивать вывод NMEA |
 | `--baud N` | `115200` | целевая скорость UART1 |
 | `--no-save` | выкл | применить только в RAM (тест, откатится при отключении питания) |
@@ -339,6 +340,13 @@ PRN-маска оставлена по умолчанию — все систе�
 |---|---|---|
 | `CFG_NAVSPG_OUTFIL_PDOP` / `_TDOP` | 250/250 (= 25.0/25.0) | заводское значение и так соответствует «мягкой» рекомендации для авто; жёсткая маска приводит к потере решения в тоннелях и дворах |
 | `CFG_NAVSPG_INFIL_MINCNO` | 6 dBHz | популярные гайды предлагают 10–15, но для движущегося автомобиля важнее **удержать** слабые спутники; шум и так режется отсечкой по углу места 10° |
+
+Если всё же хотите значения из гайда — на каждый параметр есть ключ, и без него в приёмник
+ничего не пишется:
+
+```bash
+ublox-setup --yes --min-cno 12 --max-pdop 10 --max-tdop 10
+```
 
 ### Слои сохранения
 

@@ -135,6 +135,11 @@ class Profile:
     min_elev: int = 10
     baud: int = 115200                    # target UART1 baud
     save: bool = True                     # write RAM+BBR+Flash vs RAM only
+    # Optional filters, left at the receiver's factory values when None.
+    # Tightening them trades fix availability for fix quality -- see --help.
+    min_cno: Optional[int] = None         # dBHz, signal strength mask
+    max_pdop: Optional[float] = None      # PDOP above which no fix is output
+    max_tdop: Optional[float] = None      # TDOP above which no fix is output
 
 
 # =============================================================================
@@ -429,12 +434,24 @@ def build_config(profile: Profile) -> List[Tuple[str, List[Tuple[str, int]]]]:
         for k in keys:
             gnss.append((k, on))
 
+    nav = [
+        ("CFG_NAVSPG_DYNMODEL", DYNMODELS[profile.dynmodel]),
+        ("CFG_NAVSPG_INFIL_MINELEV", profile.min_elev),  # degrees
+    ]
+    # Optional quality filters -- only written when the user asked for them,
+    # so an unset value keeps whatever the receiver shipped with.
+    if profile.min_cno is not None:
+        nav.append(("CFG_NAVSPG_INFIL_MINCNO", profile.min_cno))   # dBHz
+    if profile.max_pdop is not None:
+        nav.append(("CFG_NAVSPG_OUTFIL_PDOP",                      # 0.1 units
+                    int(round(profile.max_pdop * 10))))
+    if profile.max_tdop is not None:
+        nav.append(("CFG_NAVSPG_OUTFIL_TDOP",
+                    int(round(profile.max_tdop * 10))))
+
     groups = [
         ("gnss", gnss),
-        ("nav", [
-            ("CFG_NAVSPG_DYNMODEL", DYNMODELS[profile.dynmodel]),
-            ("CFG_NAVSPG_INFIL_MINELEV", profile.min_elev),  # degrees
-        ]),
+        ("nav", nav),
         ("rate", [
             ("CFG_RATE_MEAS", meas),
             ("CFG_RATE_NAV", 1),              # one nav solution per measurement
@@ -1257,8 +1274,9 @@ def build_argparser() -> argparse.ArgumentParser:
                "(fix type, sats used/in view per constellation, DOPs, position, "
                "link stats). Standalone: --check for a one-shot report, "
                "--monitor for a live view refreshed every second "
-               "(Ctrl-C to stop). Examples: "
-               "'ublox_setup.py --rate 10 --yes' | "
+               "(Ctrl-C to stop). The defaults are the recommended vehicle "
+               "profile, so 'ublox_setup.py --yes' is the whole setup. "
+               "Examples: 'ublox_setup.py --yes' | "
                "'ublox_setup.py --check --port COM5' | "
                "'ublox_setup.py --monitor --port /dev/ttyUSB0'")
     ap.add_argument("--port", help="serial port (default: scan all USB ports)")
@@ -1278,6 +1296,17 @@ def build_argparser() -> argparse.ArgumentParser:
                     help="dynamic platform model (default automotive)")
     ap.add_argument("--min-elev", type=int, default=10, metavar="DEG",
                     help="minimum satellite elevation in degrees (default 10)")
+    ap.add_argument("--min-cno", type=int, metavar="DBHZ",
+                    help="signal strength mask: drop satellites weaker than "
+                         "this (factory default 6 is kept if unset; raising "
+                         "it to 10-15 cleans up the fix in the open but "
+                         "loses it sooner in tunnels and urban canyons)")
+    ap.add_argument("--max-pdop", type=float, metavar="PDOP",
+                    help="suppress the fix when PDOP exceeds this "
+                         "(factory default 25.0 is kept if unset)")
+    ap.add_argument("--max-tdop", type=float, metavar="TDOP",
+                    help="suppress the fix when TDOP exceeds this "
+                         "(factory default 25.0 is kept if unset)")
     ap.add_argument("--systems", metavar="LIST",
                     help="comma list of: " + ",".join(ALL_SYSTEMS))
     ap.add_argument("--no-save", action="store_true",
@@ -1333,7 +1362,9 @@ def _run(args) -> int:
 
     base = Profile(rate=rate, systems=systems, talker=args.talker,
                    dynmodel=args.dynmodel, min_elev=args.min_elev,
-                   baud=args.baud, save=not args.no_save)
+                   baud=args.baud, save=not args.no_save,
+                   min_cno=args.min_cno, max_pdop=args.max_pdop,
+                   max_tdop=args.max_tdop)
 
     # --- dry run: show the plan, touch nothing --------------------------------
     if args.dry_run:

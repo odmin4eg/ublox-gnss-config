@@ -96,39 +96,41 @@ bridge (PL2303, CP210x, CH340/CH341, FTDI).
 
 ## Install
 
-You need **Python 3.10+** and two packages: [`pyserial`](https://pypi.org/project/pyserial/)
-and [`pyubx2`](https://pypi.org/project/pyubx2/). The 3.10 floor comes from `pyubx2`/`pynmeagps`, not from this tool.
+You need **Python 3.10+**. The 3.10 floor comes from `pyubx2`/`pynmeagps`, not from this tool.
 
-### Windows
-
-1. Install Python from [python.org](https://www.python.org/downloads/) — tick
-   **"Add python.exe to PATH"** in the installer.
-2. Open **PowerShell** or **cmd** and run:
-
-   ```powershell
-   pip install pyserial pyubx2
-   curl -L -o ublox_setup.py https://raw.githubusercontent.com/odmin4eg/ublox-gnss-config/main/ublox_setup.py
-   python ublox_setup.py --list
-   ```
-
-3. **Drivers.** Windows 10/11 recognises u-blox native USB and CP210x/FTDI out of the box.
-   For a cheap **PL2303** or **CH340** adapter you may need the vendor driver
-   ([CH340](https://www.wch-ic.com/downloads/CH341SER_EXE.html),
-   [PL2303](https://www.prolific.com.tw/US/ShowProduct.aspx?p_id=225&pcid=41)).
-   Check **Device Manager → Ports (COM & LPT)** — the port must appear without a yellow "!".
-4. **Close u-center before running this tool** — Windows gives exclusive access to a COM port,
-   and u-center holds it.
-
-### Linux
+### Any OS — as a package (recommended)
 
 ```bash
-# Debian / Ubuntu / Raspberry Pi OS
-sudo apt install python3-pip
-pip3 install --user pyserial pyubx2        # or: sudo apt install python3-serial && pip3 install --user pyubx2
-
-wget https://raw.githubusercontent.com/odmin4eg/ublox-gnss-config/main/ublox_setup.py
-python3 ublox_setup.py --list
+pipx install git+https://github.com/odmin4eg/ublox-gnss-config
+# or: pip install git+https://github.com/odmin4eg/ublox-gnss-config
+ublox-setup --list
 ```
+
+This pulls in [`pyserial`](https://pypi.org/project/pyserial/) and
+[`pyubx2`](https://pypi.org/project/pyubx2/) and gives you the `ublox-setup` command.
+
+### Any OS — single file, no install
+
+```bash
+pip install pyserial pyubx2
+curl -L -O https://raw.githubusercontent.com/odmin4eg/ublox-gnss-config/main/ublox_setup.py
+python3 ublox_setup.py --list          # Windows: python ublox_setup.py --list
+```
+
+Everything below is per-OS detail you only need when a port does not show up.
+
+### Windows notes
+
+- Install Python from [python.org](https://www.python.org/downloads/) — tick
+  **"Add python.exe to PATH"** in the installer.
+- **Drivers.** Windows 10/11 recognises u-blox native USB and CP210x/FTDI out of the box.
+  A cheap **PL2303** or **CH340** adapter may need the vendor driver
+  ([CH340](https://www.wch-ic.com/downloads/CH341SER_EXE.html),
+  [PL2303](https://www.prolific.com.tw/US/ShowProduct.aspx?p_id=225&pcid=41)).
+  Check **Device Manager → Ports (COM & LPT)** — the port must appear without a yellow "!".
+- **Close u-center first** — Windows gives exclusive access to a COM port, and u-center holds it.
+
+### Linux notes
 
 **Serial port permissions.** Without this you get `Permission denied: '/dev/ttyUSB0'`:
 
@@ -144,39 +146,37 @@ may renegotiate the rate in RAM. Stop it first:
 sudo systemctl stop gpsd gpsd.socket
 ```
 
-Note: on many distributions the packaged `pyubx2` is old or missing — prefer `pip`. If your
-system is "externally managed" (PEP 668, e.g. Ubuntu 24.04) use `pipx` or a venv:
+On "externally managed" systems (PEP 668, e.g. Ubuntu 24.04) plain `pip install` is refused —
+use `pipx` as above, or a venv:
 
 ```bash
 python3 -m venv ~/.venvs/ublox && ~/.venvs/ublox/bin/pip install pyserial pyubx2
 ~/.venvs/ublox/bin/python ublox_setup.py --list
 ```
 
-### macOS
+### macOS notes
 
-```bash
-brew install python                        # or use the python.org installer
-pip3 install pyserial pyubx2
-
-curl -L -O https://raw.githubusercontent.com/odmin4eg/ublox-gnss-config/main/ublox_setup.py
-python3 ublox_setup.py --list
-```
-
-macOS needs **no driver** for u-blox native USB, CP210x or FTDI (built in since Big Sur).
+No driver is needed for u-blox native USB, CP210x or FTDI (built in since Big Sur).
 CH340 and old PL2303 clones do need a vendor kext/driver.
 
 Always use the **`/dev/cu.*`** device, never `/dev/tty.*` — `tty.*` blocks waiting for a
 carrier signal. The tool already prefers `cu.*` when scanning.
 
-### As a package (any OS)
+## Quick start
+
+**Just set up a typical vehicle receiver, properly:**
 
 ```bash
-pipx install git+https://github.com/odmin4eg/ublox-gnss-config
-# or: pip install git+https://github.com/odmin4eg/ublox-gnss-config
-ublox-setup --list
+ublox-setup --yes
 ```
 
-## Quick start
+That is the whole thing. The defaults **are** the recommended automotive profile: 10 Hz, every
+constellation the chip can run at once, NMEA 4.1 with the sentences you need and the ones you
+don't turned off, automotive dynamic model, 10° elevation mask, SBAS corrections, interference
+monitor and AssistNow on, written to flash. It finds the receiver itself, adapts to the
+generation, and prints a satellite report at the end so you can see it working.
+
+Everything else is a variation on that:
 
 ```bash
 # what is plugged in?
@@ -185,14 +185,11 @@ ublox-setup --list
 # interactive: asks for rate and constellations, then configures everything it finds
 ublox-setup
 
-# the common case: 10 Hz, saved to flash, no questions
-ublox-setup --rate 10 --yes
-
 # one specific receiver, 5 Hz, pedestrian profile
 ublox-setup --port /dev/ttyUSB0 --rate 5 --dynmodel pedestrian --yes
 
 # see what would be sent, touch nothing
-ublox-setup --dry-run --rate 10
+ublox-setup --dry-run
 
 # try it without committing to flash (reverts on power cycle)
 ublox-setup --no-save --yes
@@ -200,7 +197,7 @@ ublox-setup --no-save --yes
 # just look at the receiver: live fix / satellites / signal strength
 ublox-setup --monitor --port COM3
 
-# just check the link quality of an already-configured receiver
+# just check an already-configured receiver
 ublox-setup --check 10 --port /dev/ttyUSB0
 ```
 
@@ -215,6 +212,9 @@ ublox-setup --check 10 --port /dev/ttyUSB0
 | `--talker gp\|gn` | `gp` | NMEA main talker ID — `$GPxxx` or standard multi-GNSS `$GNxxx` |
 | `--dynmodel NAME` | `automotive` | `portable`, `stationary`, `pedestrian`, `automotive`, `sea`, `airborne1g/2g/4g` |
 | `--min-elev DEG` | `10` | elevation mask — ignore satellites below this angle |
+| `--min-cno DBHZ` | factory (6) | signal strength mask — drop satellites weaker than this |
+| `--max-pdop PDOP` | factory (25.0) | suppress the fix when PDOP is worse than this |
+| `--max-tdop TDOP` | factory (25.0) | suppress the fix when TDOP is worse than this |
 | `--iface auto\|uart1\|usb\|both` | `auto` | which receiver interface gets the NMEA output configured |
 | `--baud N` | `115200` | target UART1 baud rate |
 | `--no-save` | off | apply to RAM only (test; reverts on power cycle) |
@@ -259,9 +259,15 @@ If your software is standards-correct and you want proper multi-GNSS talkers, us
 | AssistNow Autonomous | on | fast re-fix after tunnels, bridges, parking garages |
 | Saved to | RAM + BBR + Flash | survives a full power-off |
 
-Deliberately **left at factory defaults**: `PDOP`/`TDOP` output filters and the `MINCNO`
-signal-strength mask. Tightening them looks good on paper but costs you the fix in tunnels,
-urban canyons and under trees. The 10° elevation mask already removes most of the junk.
+Deliberately **left at factory defaults**: the `PDOP`/`TDOP` output filters and the `MINCNO`
+signal-strength mask. Guides often recommend tightening these; it looks good on paper but costs
+you the fix in tunnels, urban canyons and under trees, and the 10° elevation mask already
+removes most of the junk. If you want them anyway, they are one flag each — nothing is written
+unless you ask:
+
+```bash
+ublox-setup --yes --min-cno 12 --max-pdop 10 --max-tdop 10
+```
 
 See [README.ru.md](README.ru.md) for a key-by-key reference of every `CFG-VALSET` value the
 tool writes.
