@@ -96,8 +96,8 @@ NMEA-сообщений. Штатный способ это изменить —
 
 ## Установка
 
-Нужен **Python 3.8+** и два пакета: [`pyserial`](https://pypi.org/project/pyserial/) и
-[`pyubx2`](https://pypi.org/project/pyubx2/).
+Нужен **Python 3.10+** и два пакета: [`pyserial`](https://pypi.org/project/pyserial/) и
+[`pyubx2`](https://pypi.org/project/pyubx2/). Ограничение 3.10 идёт от `pyubx2`/`pynmeagps`, а не от самой утилиты.
 
 ### Windows
 

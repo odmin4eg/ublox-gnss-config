@@ -227,8 +227,10 @@ def link_kind(port: str, entries: Optional[List[dict]] = None) -> str:
 def print_port_list() -> int:
     entries = enumerate_ports()
     if not entries:
+        # Listing is informational: "nothing plugged in" is an answer, not an
+        # error, so it must not fail scripts or CI.
         print("No serial ports found.")
-        return 1
+        return 0
     # Motherboard UARTs (/dev/ttyS*, no USB VID) are almost never the receiver
     # and a PC can expose dozens of them -- summarize instead of listing.
     usb = [e for e in entries if e["vid"] is not None]

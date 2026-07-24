@@ -7,7 +7,7 @@ name = "ublox-gnss-config"
 version = "1.0.0"
 description = "Configure u-blox GNSS receivers (M8/M9/M10) over UBX CFG-VALSET: rate, constellations, NMEA output, saved to flash"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Sergey Brandukov" }]
 keywords = ["ublox", "u-blox", "gnss", "gps", "nmea", "ubx", "serial", "10hz"]

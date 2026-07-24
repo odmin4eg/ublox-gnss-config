@@ -96,8 +96,8 @@ bridge (PL2303, CP210x, CH340/CH341, FTDI).
 
 ## Install
 
-You need **Python 3.8+** and two packages: [`pyserial`](https://pypi.org/project/pyserial/)
-and [`pyubx2`](https://pypi.org/project/pyubx2/).
+You need **Python 3.10+** and two packages: [`pyserial`](https://pypi.org/project/pyserial/)
+and [`pyubx2`](https://pypi.org/project/pyubx2/). The 3.10 floor comes from `pyubx2`/`pynmeagps`, not from this tool.
 
 ### Windows
 
