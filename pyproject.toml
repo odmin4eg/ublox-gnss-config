@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ublox-gnss-config"
+version = "1.0.0"
+description = "Configure u-blox GNSS receivers (M8/M9/M10) over UBX CFG-VALSET: rate, constellations, NMEA output, saved to flash"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "Sergey Brandukov" }]
+keywords = ["ublox", "u-blox", "gnss", "gps", "nmea", "ubx", "serial", "10hz"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: System :: Hardware :: Hardware Drivers",
+]
+dependencies = [
+    "pyserial>=3.5",
+    "pyubx2>=1.2.38",
+]
+
+[project.urls]
+Homepage = "https://github.com/odmin4eg/ublox-gnss-config"
+Issues = "https://github.com/odmin4eg/ublox-gnss-config/issues"
+
+[project.scripts]
+ublox-setup = "ublox_setup:main"
+
+[tool.setuptools]
+py-modules = ["ublox_setup"]
