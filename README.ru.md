@@ -98,40 +98,70 @@ NMEA-сообщений. Штатный способ это изменить —
 
 Нужен **Python 3.10+**. Ограничение 3.10 идёт от `pyubx2`/`pynmeagps`, а не от самой утилиты.
 
-### Любая ОС — как пакет (рекомендуется)
+> **Два имени, не путайте:**
+> файл на диске — **`ublox_setup.py`** (через **подчёркивание**), установленная команда —
+> **`ublox-setup`** (через **дефис**). Файла `ublox-setup.py` не существует.
+
+### Windows
+
+1. Поставьте Python с [python.org](https://www.python.org/downloads/). В установщике отметьте
+   **«Add python.exe to PATH»**. (Не полагайтесь на «python3», который предлагает Windows, — это
+   заглушка из Microsoft Store, она просто печатает `Python` и ничего не делает. Используйте
+   **`python`**.)
+2. Установите утилиту вместе с зависимостями одной строкой — **git не нужен**:
+
+   ```powershell
+   pip install "https://github.com/odmin4eg/ublox-gnss-config/archive/refs/heads/main.zip"
+   ```
+3. Запуск. Если `ublox-setup` «не распознано» (папка со скриптами не в PATH — обычное дело на
+   Windows), используйте форму через модуль, она работает всегда:
+
+   ```powershell
+   python -m ublox_setup --list
+   python -m ublox_setup --yes        # настроить приёмник
+   ```
+
+**Хотите просто скачать файл?** Кнопка **Code ▸ Download ZIP** (зелёная), распакуйте, и в этой
+папке:
+
+```powershell
+pip install pyserial pyubx2
+python ublox_setup.py --list          # именно python (не python3) и подчёркивание в имени
+```
+
+Частые грабли на Windows — по тексту ошибки, которую вы получили:
+
+| Что набрали / увидели | Решение |
+|---|---|
+| `pipx: ... не распознано` | pipx на Windows по умолчанию нет — используйте строку `pip install` выше |
+| `Cannot find command 'git'` | форме `git+https://…` нужен git; берите `.zip`-URL выше, ему git не нужен |
+| `ublox-setup: ... не распознано` | папка Scripts не в PATH — запускайте `python -m ublox_setup ...` |
+| `can't open file '...ublox-setup'` | неверное имя — файл `ublox_setup.py` (подчёркивание), и надо указать `.py` |
+| `python3 ...` печатает просто `Python` | это заглушка из Store; используйте `python` (без 3) |
+
+**Драйверы.** Windows 10/11 сама видит нативный USB u-blox, а также CP210x и FTDI.
+Для дешёвых **PL2303** и **CH340** может понадобиться драйвер производителя
+([CH340](https://www.wch-ic.com/downloads/CH341SER_EXE.html),
+[PL2303](https://www.prolific.com.tw/US/ShowProduct.aspx?p_id=225&pcid=41)).
+Проверьте **Диспетчер устройств → Порты (COM и LPT)**: порт должен быть без жёлтого «!».
+**Закройте u-center перед запуском** — Windows отдаёт COM-порт одной программе за раз, а u-center
+его удерживает.
+
+### Linux
 
 ```bash
-pipx install git+https://github.com/odmin4eg/ublox-gnss-config
-# или: pip install git+https://github.com/odmin4eg/ublox-gnss-config
+pip install "https://github.com/odmin4eg/ublox-gnss-config/archive/refs/heads/main.zip"
 ublox-setup --list
 ```
 
-Подтянет [`pyserial`](https://pypi.org/project/pyserial/) и
-[`pyubx2`](https://pypi.org/project/pyubx2/) и даст команду `ublox-setup`.
-
-### Любая ОС — одним файлом, без установки
+git не нужен. В «externally managed» системах (PEP 668, например Ubuntu 24.04) системный
+`pip install` запрещён — используйте `pipx install "<тот же .zip-URL>"` или venv:
 
 ```bash
-pip install pyserial pyubx2
-curl -L -O https://raw.githubusercontent.com/odmin4eg/ublox-gnss-config/main/ublox_setup.py
-python3 ublox_setup.py --list          # в Windows: python ublox_setup.py --list
+python3 -m venv ~/.venvs/ublox
+~/.venvs/ublox/bin/pip install "https://github.com/odmin4eg/ublox-gnss-config/archive/refs/heads/main.zip"
+~/.venvs/ublox/bin/ublox-setup --list
 ```
-
-Всё, что ниже — детали по конкретной ОС, нужные только если порт не появляется.
-
-### Windows: на что смотреть
-
-- Python ставьте с [python.org](https://www.python.org/downloads/) — в установщике обязательно
-  отметьте **«Add python.exe to PATH»**.
-- **Драйверы.** Windows 10/11 сама видит нативный USB u-blox, а также CP210x и FTDI.
-  Для дешёвых **PL2303** и **CH340** может понадобиться драйвер производителя
-  ([CH340](https://www.wch-ic.com/downloads/CH341SER_EXE.html),
-  [PL2303](https://www.prolific.com.tw/US/ShowProduct.aspx?p_id=225&pcid=41)).
-  Проверьте **Диспетчер устройств → Порты (COM и LPT)**: порт должен быть без жёлтого «!».
-- **Закройте u-center перед запуском** — Windows даёт эксклюзивный доступ к COM-порту,
-  а u-center его удерживает.
-
-### Linux: на что смотреть
 
 **Права на порт.** Без этого будет `Permission denied: '/dev/ttyUSB0'`:
 
@@ -140,22 +170,15 @@ sudo usermod -aG dialout $USER     # Debian/Ubuntu; в Arch/Fedora группа 
 # перелогиньтесь (или: newgrp dialout), чтобы группа применилась
 ```
 
-**Если запущен `gpsd`**, он держит порт и будет соперничать за него, а его драйвер u-blox
-умеет переставлять частоту в RAM. Остановите:
+**Если запущен `gpsd`**, он держит порт и будет соперничать за него, а его драйвер u-blox умеет
+переставлять частоту в RAM. Остановите: `sudo systemctl stop gpsd gpsd.socket`.
+
+### macOS
 
 ```bash
-sudo systemctl stop gpsd gpsd.socket
+pip3 install "https://github.com/odmin4eg/ublox-gnss-config/archive/refs/heads/main.zip"
+ublox-setup --list
 ```
-
-В свежих дистрибутивах (PEP 668, например Ubuntu 24.04) системный pip запрещён — используйте
-`pipx` (см. выше) или venv:
-
-```bash
-python3 -m venv ~/.venvs/ublox && ~/.venvs/ublox/bin/pip install pyserial pyubx2
-~/.venvs/ublox/bin/python ublox_setup.py --list
-```
-
-### macOS: на что смотреть
 
 Драйверы для нативного USB u-blox, CP210x и FTDI встроены в систему (начиная с Big Sur).
 Для CH340 и старых клонов PL2303 драйвер нужен.
@@ -163,7 +186,16 @@ python3 -m venv ~/.venvs/ublox && ~/.venvs/ublox/bin/pip install pyserial pyubx2
 Всегда используйте устройство **`/dev/cu.*`**, а не `/dev/tty.*`: `tty.*` блокируется в ожидании
 сигнала несущей. Утилита при сканировании сама предпочитает `cu.*`.
 
+### Уже есть git?
+
+`pip install git+https://github.com/odmin4eg/ublox-gnss-config` тоже работает и отслеживает репо,
+но `.zip`-URL выше вообще не требует git.
+
 ## Быстрый старт
+
+В примерах ниже — команда `ublox-setup`. На **Windows** (и везде, где команды нет в PATH) пишите
+вместо неё **`python -m ublox_setup`** (например, `python -m ublox_setup --yes`). Если вы не
+устанавливали пакет, а запускаете один файл — `python ublox_setup.py --yes`.
 
 **Просто настроить типовой автомобильный приёмник как надо:**
 

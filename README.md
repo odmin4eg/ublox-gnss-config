@@ -98,39 +98,68 @@ bridge (PL2303, CP210x, CH340/CH341, FTDI).
 
 You need **Python 3.10+**. The 3.10 floor comes from `pyubx2`/`pynmeagps`, not from this tool.
 
-### Any OS — as a package (recommended)
+> **Two names, don't mix them up:**
+> the file on disk is **`ublox_setup.py`** (under**score**), the installed command is
+> **`ublox-setup`** (**hyphen**). `ublox-setup.py` does not exist.
+
+### Windows
+
+1. Install Python from [python.org](https://www.python.org/downloads/). In the installer tick
+   **"Add python.exe to PATH"**. (Do **not** rely on the "python3" that Windows offers — that is
+   a Microsoft Store stub that just prints `Python` and does nothing. Use **`python`**.)
+2. Install the tool and its dependencies in one line — this needs **no git**:
+
+   ```powershell
+   pip install "https://github.com/odmin4eg/ublox-gnss-config/archive/refs/heads/main.zip"
+   ```
+3. Run it. If `ublox-setup` is "not recognized" (its folder is not on PATH — common on Windows),
+   use the module form, which always works:
+
+   ```powershell
+   python -m ublox_setup --list
+   python -m ublox_setup --yes        # configure the receiver
+   ```
+
+**Prefer to just download the file?** From the green **Code ▸ Download ZIP** button, extract it,
+then in that folder:
+
+```powershell
+pip install pyserial pyubx2
+python ublox_setup.py --list          # note: python (not python3), underscore in the name
+```
+
+Common Windows gotchas, matched to the error you get:
+
+| You typed / saw | Fix |
+|---|---|
+| `pipx: ... not recognized` | pipx is not installed on Windows by default — use the `pip install` line above instead |
+| `Cannot find command 'git'` | the `git+https://…` form needs git; use the `.zip` URL above, which does not |
+| `ublox-setup: ... not recognized` | the Scripts folder is not on PATH — run `python -m ublox_setup ...` |
+| `can't open file '...ublox-setup'` | wrong name — the file is `ublox_setup.py` (underscore), and you must pass the `.py` |
+| `python3 ...` just prints `Python` | that is the Store stub; use `python` (no 3) |
+
+**Drivers.** Windows 10/11 recognises u-blox native USB and CP210x/FTDI out of the box.
+A cheap **PL2303** or **CH340** adapter may need the vendor driver
+([CH340](https://www.wch-ic.com/downloads/CH341SER_EXE.html),
+[PL2303](https://www.prolific.com.tw/US/ShowProduct.aspx?p_id=225&pcid=41)).
+Check **Device Manager → Ports (COM & LPT)** — the port must appear without a yellow "!".
+**Close u-center first** — Windows gives a COM port to one program at a time, and u-center holds it.
+
+### Linux
 
 ```bash
-pipx install git+https://github.com/odmin4eg/ublox-gnss-config
-# or: pip install git+https://github.com/odmin4eg/ublox-gnss-config
+pip install "https://github.com/odmin4eg/ublox-gnss-config/archive/refs/heads/main.zip"
 ublox-setup --list
 ```
 
-This pulls in [`pyserial`](https://pypi.org/project/pyserial/) and
-[`pyubx2`](https://pypi.org/project/pyubx2/) and gives you the `ublox-setup` command.
-
-### Any OS — single file, no install
+No git needed. On "externally managed" systems (PEP 668, e.g. Ubuntu 24.04) `pip install` is
+refused system-wide — use `pipx install "<same .zip URL>"`, or a venv:
 
 ```bash
-pip install pyserial pyubx2
-curl -L -O https://raw.githubusercontent.com/odmin4eg/ublox-gnss-config/main/ublox_setup.py
-python3 ublox_setup.py --list          # Windows: python ublox_setup.py --list
+python3 -m venv ~/.venvs/ublox
+~/.venvs/ublox/bin/pip install "https://github.com/odmin4eg/ublox-gnss-config/archive/refs/heads/main.zip"
+~/.venvs/ublox/bin/ublox-setup --list
 ```
-
-Everything below is per-OS detail you only need when a port does not show up.
-
-### Windows notes
-
-- Install Python from [python.org](https://www.python.org/downloads/) — tick
-  **"Add python.exe to PATH"** in the installer.
-- **Drivers.** Windows 10/11 recognises u-blox native USB and CP210x/FTDI out of the box.
-  A cheap **PL2303** or **CH340** adapter may need the vendor driver
-  ([CH340](https://www.wch-ic.com/downloads/CH341SER_EXE.html),
-  [PL2303](https://www.prolific.com.tw/US/ShowProduct.aspx?p_id=225&pcid=41)).
-  Check **Device Manager → Ports (COM & LPT)** — the port must appear without a yellow "!".
-- **Close u-center first** — Windows gives exclusive access to a COM port, and u-center holds it.
-
-### Linux notes
 
 **Serial port permissions.** Without this you get `Permission denied: '/dev/ttyUSB0'`:
 
@@ -140,21 +169,14 @@ sudo usermod -aG dialout $USER     # Debian/Ubuntu; on Arch/Fedora the group is 
 ```
 
 **If `gpsd` is running**, it grabs the port and will fight you for it — and its u-blox driver
-may renegotiate the rate in RAM. Stop it first:
+may renegotiate the rate in RAM. Stop it first: `sudo systemctl stop gpsd gpsd.socket`.
+
+### macOS
 
 ```bash
-sudo systemctl stop gpsd gpsd.socket
+pip3 install "https://github.com/odmin4eg/ublox-gnss-config/archive/refs/heads/main.zip"
+ublox-setup --list
 ```
-
-On "externally managed" systems (PEP 668, e.g. Ubuntu 24.04) plain `pip install` is refused —
-use `pipx` as above, or a venv:
-
-```bash
-python3 -m venv ~/.venvs/ublox && ~/.venvs/ublox/bin/pip install pyserial pyubx2
-~/.venvs/ublox/bin/python ublox_setup.py --list
-```
-
-### macOS notes
 
 No driver is needed for u-blox native USB, CP210x or FTDI (built in since Big Sur).
 CH340 and old PL2303 clones do need a vendor kext/driver.
@@ -162,7 +184,16 @@ CH340 and old PL2303 clones do need a vendor kext/driver.
 Always use the **`/dev/cu.*`** device, never `/dev/tty.*` — `tty.*` blocks waiting for a
 carrier signal. The tool already prefers `cu.*` when scanning.
 
+### Already have git?
+
+`pip install git+https://github.com/odmin4eg/ublox-gnss-config` works too and tracks the repo,
+but the `.zip` URL above avoids needing git at all.
+
 ## Quick start
+
+The examples below use the `ublox-setup` command. On **Windows**, or anywhere the command is not
+on PATH, write **`python -m ublox_setup`** instead (e.g. `python -m ublox_setup --yes`). If you
+did not install it and are running the single file, use `python ublox_setup.py --yes`.
 
 **Just set up a typical vehicle receiver, properly:**
 
