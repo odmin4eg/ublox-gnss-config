@@ -98,10 +98,6 @@ bridge (PL2303, CP210x, CH340/CH341, FTDI).
 
 You need **Python 3.10+**. The 3.10 floor comes from `pyubx2`/`pynmeagps`, not from this tool.
 
-> **Two names, don't mix them up:**
-> the file on disk is **`ublox_setup.py`** (under**score**), the installed command is
-> **`ublox-setup`** (**hyphen**). `ublox-setup.py` does not exist.
-
 ### Windows
 
 **Opening PowerShell** (where you type the commands): press the **Start** button (or the
