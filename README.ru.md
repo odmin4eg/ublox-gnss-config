@@ -104,6 +104,13 @@ NMEA-сообщений. Штатный способ это изменить —
 
 ### Windows
 
+**Как открыть PowerShell** (в нём вводятся команды): нажмите кнопку **Пуск** (или клавишу
+Windows), наберите **`power`** и выберите в списке **Windows PowerShell**.
+
+<img src="docs/open-powershell.svg" alt="Пуск: набрать «power» и выбрать Windows PowerShell" width="440">
+
+Дальше:
+
 1. Поставьте Python с [python.org](https://www.python.org/downloads/). В установщике отметьте
    **«Add python.exe to PATH»**. (Не полагайтесь на «python3», который предлагает Windows, — это
    заглушка из Microsoft Store, она просто печатает `Python` и ничего не делает. Используйте

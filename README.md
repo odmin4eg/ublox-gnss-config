@@ -104,6 +104,13 @@ You need **Python 3.10+**. The 3.10 floor comes from `pyubx2`/`pynmeagps`, not f
 
 ### Windows
 
+**Opening PowerShell** (where you type the commands): press the **Start** button (or the
+Windows key), type **`power`**, and click **Windows PowerShell** in the results.
+
+<img src="docs/open-powershell.svg" alt="Start menu: type 'power' and pick Windows PowerShell" width="440">
+
+Then:
+
 1. Install Python from [python.org](https://www.python.org/downloads/). In the installer tick
    **"Add python.exe to PATH"**. (Do **not** rely on the "python3" that Windows offers — that is
    a Microsoft Store stub that just prints `Python` and does nothing. Use **`python`**.)
