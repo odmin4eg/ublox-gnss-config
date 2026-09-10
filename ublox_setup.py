@@ -17,8 +17,10 @@ Profile applied (all of it adjustable from the command line):
   - UART1 at the chosen baud (default 115200), UBX+NMEA both directions
   - Saved to RAM + BBR + Flash so it survives a power cycle (--no-save = RAM)
 
-Per-generation limits are handled automatically: a single-band M10 cannot run
-GLONASS and BeiDou concurrently, so BeiDou is dropped (GLONASS kept).
+Capability limits are handled automatically: the receiver tracks only three
+major constellations at once, so a longer --systems list is trimmed from the
+right. GPS+GLONASS+BeiDou additionally forces BeiDou onto B1C, which costs the
+BDS-2 satellites over Asia.
 
 After configuring, the tool captures the live stream for a few seconds and
 prints a receiver report: fix type, satellites used/in view per constellation,
@@ -91,16 +93,31 @@ BRIDGE_VIDS = {                       # common USB-UART bridge chips
     0x0403: "FTDI",
 }
 
-# GNSS system -> CFG-SIGNAL enable keys (system enable + L1-band signal enable)
+# GNSS system -> CFG-SIGNAL keys and the value each takes when the system is
+# enabled. Every key is always written, so switching a system off clears its
+# signals too. BeiDou is the special case: B1I and B1C are mutually exclusive
+# (CFG-VALSET is NAKed when both are set), so the pair is always written
+# together -- see bds_signal() for which one gets picked.
 SYSTEM_KEYS = {
-    "GPS":  ["CFG_SIGNAL_GPS_ENA", "CFG_SIGNAL_GPS_L1CA_ENA"],
-    "GLO":  ["CFG_SIGNAL_GLO_ENA", "CFG_SIGNAL_GLO_L1_ENA"],
-    "GAL":  ["CFG_SIGNAL_GAL_ENA", "CFG_SIGNAL_GAL_E1_ENA"],
-    "BDS":  ["CFG_SIGNAL_BDS_ENA", "CFG_SIGNAL_BDS_B1_ENA"],
-    "QZSS": ["CFG_SIGNAL_QZSS_ENA", "CFG_SIGNAL_QZSS_L1CA_ENA"],
-    "SBAS": ["CFG_SIGNAL_SBAS_ENA", "CFG_SIGNAL_SBAS_L1CA_ENA"],
+    "GPS":  {"CFG_SIGNAL_GPS_ENA": 1, "CFG_SIGNAL_GPS_L1CA_ENA": 1},
+    "GLO":  {"CFG_SIGNAL_GLO_ENA": 1, "CFG_SIGNAL_GLO_L1_ENA": 1},
+    "GAL":  {"CFG_SIGNAL_GAL_ENA": 1, "CFG_SIGNAL_GAL_E1_ENA": 1},
+    "BDS":  {"CFG_SIGNAL_BDS_ENA": 1, "CFG_SIGNAL_BDS_B1_ENA": 1,
+             "CFG_SIGNAL_BDS_B1C_ENA": 0},
+    "QZSS": {"CFG_SIGNAL_QZSS_ENA": 1, "CFG_SIGNAL_QZSS_L1CA_ENA": 1},
+    "SBAS": {"CFG_SIGNAL_SBAS_ENA": 1, "CFG_SIGNAL_SBAS_L1CA_ENA": 1},
 }
 ALL_SYSTEMS = list(SYSTEM_KEYS.keys())
+
+# QZSS rides on GPS and SBAS is an augmentation; neither occupies one of the
+# receiver's concurrent-GNSS slots. Only these four do.
+MAJOR_SYSTEMS = ("GPS", "GLO", "GAL", "BDS")
+
+# Concurrent major constellations the receiver will actually track. Reported by
+# UBX-MON-GNSS as 'simultaneous' (3 on the M10 units tested). Asking for a
+# fourth is not always refused -- with BeiDou on B1C the VALSET is ACKed and
+# reads back as enabled, but one constellation is silently dropped at runtime.
+MAX_MAJORS = 3
 
 # CFG-NAVSPG-DYNMODEL values (u-blox interface description)
 DYNMODELS = {
@@ -400,16 +417,40 @@ def valset_supported(info: dict) -> Tuple[bool, List[str]]:
 # Configuration profile
 # =============================================================================
 
+def bds_signal(systems) -> str:
+    """Which BeiDou signal to use alongside the rest of `systems`.
+
+    B1I (1561.098 MHz) is the better choice on its own: BDS-2 and BDS-3 both
+    broadcast it, so it sees the GEO/IGSO satellites parked over Asia that
+    B1C (BDS-3 only, 1575.42 MHz) misses entirely. But GPS+GLONASS+BeiDou is
+    NAKed on B1I and accepted on B1C, so GLONASS forces the fallback.
+    """
+    return "B1C" if "GLO" in systems else "B1I"
+
+
 def adjust_systems(gen, systems: List[str]) -> Tuple[List[str], List[str]]:
-    """Apply per-generation GNSS capability limits. Returns (systems, notes)."""
+    """Apply GNSS capability limits. Returns (systems, notes).
+
+    The receiver tracks at most MAX_MAJORS major constellations. Anything past
+    that is dropped here, keeping the order the caller asked for, so the
+    priority is the user's to set via --systems.
+
+    `gen` is accepted because the limit is a per-generation property, but every
+    generation this tool targets reports the same 3 -- it is not consulted yet.
+    """
     sysset = list(systems)
     notes = []
-    # Single-band M10 cannot run GLONASS and BeiDou concurrently (VALSET
-    # would NAK) -- prefer GLONASS.
-    if gen == 10 and "GLO" in sysset and "BDS" in sysset:
-        sysset.remove("BDS")
-        notes.append("M10 cannot run GLONASS+BeiDou together -> "
-                     "BeiDou disabled, GLONASS kept")
+
+    majors = [s for s in sysset if s in MAJOR_SYSTEMS]
+    for extra in majors[MAX_MAJORS:]:
+        sysset.remove(extra)
+        notes.append("receiver tracks %d constellations at once -> %s dropped "
+                     "(reorder --systems to change the priority)"
+                     % (MAX_MAJORS, extra))
+
+    if "BDS" in sysset and bds_signal(sysset) == "B1C":
+        notes.append("GLONASS forces BeiDou onto B1C -> BDS-2 GEO/IGSO "
+                     "satellites will not be tracked")
     return sysset, notes
 
 
@@ -429,10 +470,15 @@ def build_config(profile: Profile) -> List[Tuple[str, List[Tuple[str, int]]]]:
     decim = gsx_decim(profile.rate)
 
     gnss = []
+    use_b1c = bds_signal(profile.systems) == "B1C"
     for sysname, keys in SYSTEM_KEYS.items():
-        on = 1 if sysname in profile.systems else 0
-        for k in keys:
-            gnss.append((k, on))
+        on = sysname in profile.systems
+        for k, v in keys.items():
+            if on and sysname == "BDS" and k.endswith("_B1_ENA"):
+                v = 0 if use_b1c else 1
+            elif on and sysname == "BDS" and k.endswith("_B1C_ENA"):
+                v = 1 if use_b1c else 0
+            gnss.append((k, v if on else 0))
 
     nav = [
         ("CFG_NAVSPG_DYNMODEL", DYNMODELS[profile.dynmodel]),
@@ -530,7 +576,7 @@ def estimate_load(profile: Profile) -> Tuple[int, int, float]:
     in NMEA 4.1, GSV is several. 1 byte on a UART = 10 bits (start+8+stop).
     """
     talkers = len([s for s in profile.systems
-                   if s in ("GPS", "GLO", "GAL", "BDS")]) or 1
+                   if s in MAJOR_SYSTEMS]) or 1
     gsx_hz = profile.rate / gsx_decim(profile.rate)
     bps = int(profile.rate * FULLRATE_BYTES
               + gsx_hz * talkers * PER_TALKER_BYTES)
@@ -1209,8 +1255,6 @@ def print_plan(profile: Profile, gen=None) -> None:
     prof = Profile(**{**profile.__dict__, "systems": systems})
     for note in notes:
         print("  ! %s" % note)
-    if gen is None and "GLO" in systems and "BDS" in systems:
-        print("  (note: on an M10, BeiDou would be dropped in favor of GLONASS)")
     print("  Save layers         : %s"
           % ("RAM + BBR + Flash" if prof.save else "RAM only"))
     print_load(prof)
@@ -1235,17 +1279,19 @@ def ask_rate(default: int = 10) -> int:
 
 
 def ask_systems() -> List[str]:
-    print("\nGNSS systems (M10 drops BeiDou automatically when GLONASS is on):")
-    print("  [1] All: GPS+GLONASS+Galileo+BeiDou+QZSS+SBAS (default)")
-    print("  [2] GPS+GLONASS+Galileo+QZSS+SBAS (no BeiDou)")
+    print("\nGNSS systems (only %d of GPS/GLONASS/Galileo/BeiDou run at once;"
+          % MAX_MAJORS)
+    print("extras are dropped from the right of the list):")
+    print("  [1] GPS+GLONASS+Galileo+QZSS+SBAS (default)")
+    print("  [2] GPS+Galileo+BeiDou+QZSS+SBAS (BeiDou on B1I)")
     print("  [3] Custom (comma list of: " + ",".join(ALL_SYSTEMS) + ")")
     ans = input("Choose 1/2/3 [1]: ").strip()
     if ans == "2":
-        return ["GPS", "GLO", "GAL", "QZSS", "SBAS"]
+        return ["GPS", "GAL", "BDS", "QZSS", "SBAS"]
     if ans == "3":
         raw = input("Systems: ").strip()
         return [x.strip().upper() for x in raw.split(",") if x.strip()]
-    return list(ALL_SYSTEMS)
+    return ["GPS", "GLO", "GAL", "QZSS", "SBAS"]
 
 
 def resolve_ifaces(choice: str, kind: str) -> Tuple[List[str], bool]:

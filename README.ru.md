@@ -20,7 +20,7 @@ Profile: rate=10Hz  talker=GP  dynmodel=automotive  min-elev=10
 === /dev/ttyUSB0 (gen 10) ===
   Link type           : uart1  ->  configuring: uart1  (link baud will change)
   Estimated NMEA load : ~4928 B/s of 11520 B/s at 115200 baud (43%)
-  ! M10 cannot run GLONASS+BeiDou together -> BeiDou disabled, GLONASS kept
+  ! receiver tracks 3 constellations at once -> BDS dropped (reorder --systems to change the priority)
   systems applied     : GPS,GLO,GAL,QZSS,SBAS
   uart1               : OK
   gnss                : OK
@@ -386,11 +386,25 @@ ublox-setup --yes --min-cno 12 --max-pdop 10 --max-tdop 10
 
 ## Ограничения по созвездиям
 
-- **M9** тянет все шесть систем одновременно: GPS + ГЛОНАСС + Galileo + BeiDou + QZSS + SBAS.
-- **M10** (одночастотный) **не может одновременно ГЛОНАСС и BeiDou** — это аппаратное
-  ограничение, приёмник просто отвечает NAK. Утилита определяет поколение и **отключает BeiDou,
-  оставляя ГЛОНАСС**, о чём печатает предупреждение. Если BeiDou важнее, укажите явно:
-  `--systems GPS,BDS,GAL,QZSS,SBAS`.
+Одновременно работают только **три** из GPS / ГЛОНАСС / Galileo / BeiDou — само число приёмник
+сообщает в `UBX-MON-GNSS` полем `simultaneous`. QZSS идёт поверх GPS, SBAS — аугментация, слот
+не занимает ни то, ни другое. Если запросить четвёртое, утилита отбросит лишние с конца списка
+`--systems` и напечатает предупреждение; порядок в списке задаёт приоритет.
+
+Здесь есть ловушка: с BeiDou на B1C запрос четырёх созвездий **принимается** (ACK) и читается
+обратно как включённый, но одно созвездие потом молча не трекается. Верить надо отчёту по
+спутникам, а не обратному чтению.
+
+**Выбор сигнала BeiDou.** B1I (1561.098 МГц) и B1C (1575.42 МГц) взаимоисключающие — попытка
+включить оба даёт NAK. Утилита выбирает сама:
+
+- отдельно или вместе с Galileo BeiDou получает **B1I**, который вещают и BDS-2, и BDS-3, так
+  что видны GEO и IGSO спутники над Азией;
+- рядом с **ГЛОНАСС** происходит откат на **B1C**, потому что связка `GPS+ГЛОНАСС+BeiDou` на B1I
+  отвергается. B1C вещает только BDS-3, то есть группировка BDS-2 теряется — утилита об этом
+  предупреждает.
+
+Если BeiDou для вас важен, берите `--systems GPS,GAL,BDS,QZSS,SBAS`, а не пару с ГЛОНАСС.
 
 ## Пропускная способность
 

@@ -20,7 +20,7 @@ Profile: rate=10Hz  talker=GP  dynmodel=automotive  min-elev=10
 === /dev/ttyUSB0 (gen 10) ===
   Link type           : uart1  ->  configuring: uart1  (link baud will change)
   Estimated NMEA load : ~4928 B/s of 11520 B/s at 115200 baud (43%)
-  ! M10 cannot run GLONASS+BeiDou together -> BeiDou disabled, GLONASS kept
+  ! receiver tracks 3 constellations at once -> BDS dropped (reorder --systems to change the priority)
   systems applied     : GPS,GLO,GAL,QZSS,SBAS
   uart1               : OK
   gnss                : OK
@@ -308,11 +308,24 @@ tool writes.
 
 ## Constellation limits
 
-- **M9** runs all six systems concurrently: GPS + GLONASS + Galileo + BeiDou + QZSS + SBAS.
-- **M10** (single band) **cannot run GLONASS and BeiDou at the same time** — a hardware
-  limitation; the receiver simply NAKs the request. The tool detects the generation and
-  **drops BeiDou, keeps GLONASS**, printing a note. Use `--systems GPS,BDS,GAL,QZSS,SBAS`
-  if you would rather keep BeiDou.
+Only **three** of GPS / GLONASS / Galileo / BeiDou run at once — `UBX-MON-GNSS` reports the
+number as `simultaneous`. QZSS rides on GPS and SBAS is an augmentation, so neither occupies
+a slot. Ask for a fourth and the tool drops the extras from the right of `--systems`, printing
+a note; reorder the list to set your own priority.
+
+Watch out for a trap here: with BeiDou on B1C a four-constellation request is **ACKed** and
+reads back as enabled, yet one constellation is silently dropped at runtime. Trust the
+satellite report, not the readback.
+
+**BeiDou signal choice.** B1I (1561.098 MHz) and B1C (1575.42 MHz) are mutually exclusive —
+setting both NAKs the write. The tool picks one for you:
+
+- alone or with Galileo, BeiDou gets **B1I**, which BDS-2 and BDS-3 both broadcast, so the
+  GEO/IGSO satellites parked over Asia are visible;
+- next to **GLONASS** it falls back to **B1C**, because `GPS+GLONASS+BeiDou` is refused on B1I.
+  B1C is BDS-3 only, so the BDS-2 satellites are lost — the tool warns when this happens.
+
+If BeiDou matters to you, prefer `--systems GPS,GAL,BDS,QZSS,SBAS` over pairing it with GLONASS.
 
 More constellations means more visible satellites, better geometry (lower DOP) and a faster,
 more stable fix — which is exactly what you want in a city or under trees.
