@@ -123,6 +123,25 @@ Then:
    python -m ublox_setup --yes        # configure the receiver
    ```
 
+**`pip install` cannot reach the network?** (`WinError 10013`, `Failed to establish a new
+connection`, `Max retries exceeded`) — almost always the **antivirus firewall** (Pro32/ESET,
+Kaspersky, Dr.Web…) is blocking `python.exe` from the internet while the browser still works.
+To check, in an administrator PowerShell:
+
+```powershell
+Test-NetConnection pypi.org -Port 443      # TcpTestSucceeded : False  →  something blocks the network
+Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntivirusProduct | Select-Object displayName
+```
+
+Fix: **temporarily disable the antivirus firewall**, run `pip install`, then add `python.exe`
+(path from `(Get-Command python).Source`) to its allowed applications and turn the firewall
+back on. `ublox-setup` itself never touches the network, so the antivirus does not affect it.
+Downloading the `.zip` in the browser and installing from the file does **not** help here: pip
+still goes to PyPI for `pyserial`/`pyubx2`. Only if GitHub alone is blocked and PyPI works:
+download <https://github.com/odmin4eg/ublox-gnss-config/archive/refs/heads/main.zip> and
+`pip install "$HOME\Downloads\ublox-gnss-config-main.zip"`. Behind a corporate proxy:
+`pip install --proxy http://host:port "...main.zip"`.
+
 **Prefer to just download the file?** From the green **Code ▸ Download ZIP** button, extract it,
 then in that folder:
 
@@ -137,6 +156,7 @@ Common Windows gotchas, matched to the error you get:
 |---|---|
 | `pipx: ... not recognized` | pipx is not installed on Windows by default — use the `pip install` line above instead |
 | `Cannot find command 'git'` | the `git+https://…` form needs git; use the `.zip` URL above, which does not |
+| `WinError 10013` / `Failed to establish a new connection` | the antivirus firewall is blocking `python.exe` from the network — disable it temporarily and add `python.exe` to its allowed apps (see above) |
 | `ublox-setup: ... not recognized` | the Scripts folder is not on PATH — run `python -m ublox_setup ...` |
 | `can't open file '...ublox-setup'` | wrong name — the file is `ublox_setup.py` (underscore), and you must pass the `.py` |
 | `python3 ...` just prints `Python` | that is the Store stub; use `python` (no 3) |

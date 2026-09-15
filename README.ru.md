@@ -124,12 +124,39 @@ Windows), наберите **`power`** и выберите в списке **Win
    python -m ublox_setup --yes        # настроить приёмник
    ```
 
+**`pip install` не достучался до сети?** (`WinError 10013`, `Failed to establish a new
+connection`, `Max retries exceeded`) — почти всегда это **файрвол антивируса** (Pro32/ESET,
+Kaspersky, Dr.Web…) не пускает `python.exe` в интернет; браузер при этом работает. Проверка —
+в PowerShell от имени администратора:
+
+```powershell
+Test-NetConnection pypi.org -Port 443      # TcpTestSucceeded : False  →  что-то режет сеть
+Get-CimInstance -Namespace root/SecurityCenter2 -ClassName AntivirusProduct | Select-Object displayName
+```
+
+Решение: в настройках антивируса **временно выключить файрвол**, выполнить `pip install`, затем
+добавить `python.exe` (путь покажет `(Get-Command python).Source`) в разрешённые приложения и
+включить файрвол обратно. Сам `ublox-setup` в сеть не ходит — ему антивирус не мешает.
+Скачивать `.zip` браузером и ставить из файла здесь **не поможет**: pip всё равно идёт на PyPI
+за `pyserial`/`pyubx2`. Если заблокирован только GitHub, а PyPI доступен — тогда да:
+скачайте <https://github.com/odmin4eg/ublox-gnss-config/archive/refs/heads/main.zip> и
+`pip install "$HOME\Downloads\ublox-gnss-config-main.zip"`. За корпоративным прокси:
+`pip install --proxy http://адрес:порт "...main.zip"`.
+
+**Хотите просто скачать файл?** Зелёная кнопка **Code ▸ Download ZIP**, распакуйте, и в той папке:
+
+```powershell
+pip install pyserial pyubx2
+python ublox_setup.py --list          # именно python (не python3), в имени подчёркивание
+```
+
 Частые грабли на Windows — по тексту ошибки, которую вы получили:
 
 | Что набрали / увидели | Решение |
 |---|---|
 | `pipx: ... не распознано` | pipx на Windows по умолчанию нет — используйте строку `pip install` выше |
 | `Cannot find command 'git'` | форме `git+https://…` нужен git; берите `.zip`-URL выше, ему git не нужен |
+| `WinError 10013` / `Failed to establish a new connection` | файрвол антивируса не пускает `python.exe` в сеть — временно выключите его и добавьте `python.exe` в разрешённые (см. выше) |
 | `ublox-setup: ... не распознано` | папка Scripts не в PATH — запускайте `python -m ublox_setup ...` |
 | `can't open file '...ublox-setup'` | неверное имя — файл `ublox_setup.py` (подчёркивание), и надо указать `.py` |
 | `python3 ...` печатает просто `Python` | это заглушка из Store; используйте `python` (без 3) |
